@@ -1,9 +1,12 @@
 const { ClientCertificateCredential } = require("@azure/identity"); const crypto = require("crypto");
-function toUtcBasic(dtIso) { // dtIso is ISO 8601 like 2025-09-26T20:30:00Z or local; ensure UTC basic format const d = new Date(dtIso); const yyyy = d.getUTCFullYear(); const mm = String(d.getUTCMonth() + 1).padStart(2, "0"); const dd = String(d.getUTCDate()).padStart(2, "0"); const hh = String(d.getUTCHours()).padStart(2, "0"); const mi = String(d.getUTCMinutes()).padStart(2, "0"); const ss = String(d.getUTCSeconds()).padStart(2, "0"); return ${yyyy}${mm}${dd}T${hh}${mi}${ss}Z; }
 
-function foldIcsLine(line) { // Fold at 75 octets max; simple 75-char fold helps Outlook const max = 75; if (line.length <= max) return line; let out = line.slice(0, max); let i = max; while (i < line.length) { out += "\r\n " + line.slice(i, i + max); i += max; } return out; }
+function toUtcBasic(dtIso) { const d = new Date(dtIso); const yyyy = d.getUTCFullYear(); const mm = String(d.getUTCMonth() + 1).padStart(2, "0"); const dd = String(d.getUTCDate()).padStart(2, "0"); const hh = String(d.getUTCHours()).padStart(2, "0"); const mi = String(d.getUTCMinutes()).padStart(2, "0"); const ss = String(d.getUTCSeconds()).padStart(2, "0"); return ${yyyy}${mm}${dd}T${hh}${mi}${ss}Z; }
 
-function buildIcsRequest({ uid, organizer, attendee, startIso, endIso, subject, description }) { const dtstamp = toUtcBasic(new Date().toISOString()); const dtstart = toUtcBasic(startIso); const dtend = toUtcBasic(endIso); const lines = [ "BEGIN:VCALENDAR", "PRODID:-//BookKeys//EN", "VERSION:2.0", "CALSCALE:GREGORIAN", "METHOD:REQUEST", "BEGIN:VEVENT", UID:${uid}, DTSTAMP:${dtstamp}, DTSTART:${dtstart}, DTEND:${dtend}, foldIcsLine(SUMMARY:${subject}), ...description.split("\n").map((l) => foldIcsLine(DESCRIPTION:${l})), ORGANIZER:MAILTO:${organizer}, foldIcsLine(ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION:MAILTO:${attendee}), "END:VEVENT", "END:VCALENDAR" ]; return lines.join("\r\n") + "\r\n"; }
+// RFC5545 escaping for TEXT values function icsEscape(s) { return String(s) .replace(/\/g, "\\") .replace(/\n/g, "\n") .replace(/,/g, "\,") .replace(/;/g, "\;"); }
+
+function foldIcsLine(line) { const max = 75; if (line.length <= max) return line; let out = line.slice(0, max); for (let i = max; i < line.length; i += max) { out += "\r\n " + line.slice(i, i + max); } return out; }
+
+function buildIcsRequest({ uid, organizer, attendee, startIso, endIso, subject, description }) { const dtstamp = toUtcBasic(new Date().toISOString()); const dtstart = toUtcBasic(startIso); const dtend = toUtcBasic(endIso); const lines = [ "BEGIN:VCALENDAR", "PRODID:-//BookKeys//EN", "VERSION:2.0", "CALSCALE:GREGORIAN", "METHOD:REQUEST", "BEGIN:VEVENT", UID:${uid}, DTSTAMP:${dtstamp}, DTSTART:${dtstart}, DTEND:${dtend}, foldIcsLine(SUMMARY:${icsEscape(subject)}), foldIcsLine(DESCRIPTION:${icsEscape(description)}), ORGANIZER:MAILTO:${organizer}, foldIcsLine(ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION:MAILTO:${attendee}), "END:VEVENT", "END:VCALENDAR" ]; return lines.join("\r\n") + "\r\n"; }
 
 async function getToken() { const tenantId = process.env.TENANT_ID; const clientId = process.env.CLIENT_ID; const pem = process.env.CERT_PEM; if (!tenantId || !clientId || !pem) throw new Error("Missing TENANT_ID, CLIENT_ID, or CERT_PEM"); const cred = new ClientCertificateCredential(tenantId, clientId, { certificate: pem }); const token = await cred.getToken("https://graph.microsoft.com/.default"); return token.token; }
 
@@ -26,11 +29,9 @@ if (!execEmail || !start || !end || !custName || !custEmail) {
 const uid = crypto.randomUUID();
 const brand = process.env.BRAND_NAME || "Booking";
 const subject = `${brand} request: ${custName}`;
-const desc = [
-  `Customer: ${custName}`,
-  `Email: ${custEmail}`,
-  notes ? `Notes: ${notes}` : ""
-].filter(Boolean).join("\n");
+const desc = [`Customer: ${custName}`, `Email: ${custEmail}`, notes ? `Notes: ${notes}` : ""]
+  .filter(Boolean)
+  .join("\n");
 
 const ics = buildIcsRequest({
   uid,
@@ -48,13 +49,12 @@ const message = {
     subject,
     body: { contentType: "Text", content: `${brand} meeting request attached.` },
     toRecipients: [{ emailAddress: { address: execEmail } }],
-    // add a header with UID to ease correlation if needed
     internetMessageHeaders: [{ name: "X-BookKeys-Request-Uid", value: uid }],
     attachments: [
       {
         "@odata.type": "#microsoft.graph.fileAttachment",
         name: "request.ics",
-        contentType: "text/calendar; method=REQUEST",
+        contentType: "text/calendar; method=REQUEST; charset=UTF-8",
         contentBytes: base64Ics
       }
     ]
@@ -77,5 +77,5 @@ if (!resp.ok) {
 }
 
 context.res = { status: 200, headers: { "content-type": "application/json" }, body: { uid } };
-                    
+
 } catch (err) { context.log.error(err); context.res = { status: 500, body: { error: err.message } }; } };
