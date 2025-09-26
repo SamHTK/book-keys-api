@@ -35,8 +35,4 @@ if (!resp.ok) {
 
 context.res = { status: 200, headers: { "content-type": "application/json" }, body: data };
 
-Copy
-
-Insert
-
 } catch (err) { context.log.error(err); context.res = { status: 500, body: { error: err.message } }; } };
