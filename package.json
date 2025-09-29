@@ -1,1 +1,1 @@
-{ "name": "book-keys-api", "version": "0.0.1", "private": true, "type": "commonjs", "engines": { "node": ">=20" }, "dependencies": { "@azure/identity": "^4.2.1" } }
+{ "name": "book-keys-api", "version": "0.0.3", "private": true, "type": "commonjs", "engines": { "node": ">=20" }, "dependencies": { "@azure/identity": "^4.2.1", "@azure/data-tables": "^13.3.0" } }
