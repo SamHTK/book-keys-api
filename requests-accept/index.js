@@ -137,7 +137,7 @@ module.exports = async function (context, req) {
     context.res = {
       status: 200,
       headers: { "content-type": "text/html" },
-      body: htmlPage("Approved", "<p>Meeting approved. Invites have been sent from the exec's calendar.</p>")
+      body: htmlPage("Approved", "<p>Meeting approved. Invites have been sent.</p>")
     };
 
   } catch (err) {
