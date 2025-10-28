@@ -109,23 +109,44 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-  function fmtLocal(dtStr) {
+  function getETOffset(dateStr) {
+  // Create a Date object from the string (treated as local for parsing purposes)
+  const dt = new Date(dateStr);
+
+  // Use toLocaleString to get the ET time components
+  const options = { timeZone: 'America/New_York', hour12: false };
+  const parts = dt.toLocaleString('en-US', options).split(/[\/, :]/);
+
+  // parts = [month, day, year, hour, minute, second] — just need offset
+  const dtET = new Date(Date.UTC(parts[2], parts[0]-1, parts[1], parts[3], parts[4], parts[5]));
+
+  // Offset in minutes between ET and UTC
+  const offsetMinutes = (dtET - dt) / 60000;
+
+  const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+  const minutes = Math.abs(offsetMinutes) % 60;
+  const sign = offsetMinutes > 0 ? '-' : '+';
+  return `${sign}${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+}
+
+
+function fmtLocal(dtStr) {
   try {
-    // Treat input as "Eastern Time" without converting from UTC
-    // Append ET offset to ISO string (Eastern Time is UTC-5 or UTC-4 depending on DST)
-    // Using Intl API with timeZone works correctly
-    return new Intl.DateTimeFormat('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit', 
-      hour12: true, 
-      timeZone: 'America/New_York'
-    }).format(new Date(dtStr));
+    const offset = getETOffset(dtStr);            // e.g., '-04:00' or '-05:00'
+    const dtWithOffset = dtStr + offset;          // append ET offset
+    return new Date(dtWithOffset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   } catch {
     return dtStr;
   }
 }
 
-  function ymd(d) { return d.toISOString().slice(0,10); }
+  function ymd(d) {
+  // Convert to ET
+  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
+  const parts = d.toLocaleDateString('en-US', options).split('/');
+  return `${parts[2]}-${parts[0]}-${parts[1]}`; // YYYY-MM-DD
+}
+
 
   const dateEl = document.getElementById('date');
   const durationEl = document.getElementById('duration');
