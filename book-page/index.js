@@ -109,42 +109,35 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-  function getETOffset(dateStr) {
-  // Create a Date object from the string (treated as local for parsing purposes)
+function getETOffset(dateStr) {
+  // Parse the date as local time (or as UTC)
   const dt = new Date(dateStr);
 
-  // Use toLocaleString to get the ET time components
-  const options = { timeZone: 'America/New_York', hour12: false };
-  const parts = dt.toLocaleString('en-US', options).split(/[\/, :]/);
+  // Create a Date object in ET using Intl
+  const etDate = new Date(dt.toLocaleString('en-US', { timeZone: 'America/New_York' }));
 
-  // parts = [month, day, year, hour, minute, second] — just need offset
-  const dtET = new Date(Date.UTC(parts[2], parts[0]-1, parts[1], parts[3], parts[4], parts[5]));
+  // Difference in minutes between ET and UTC
+  const offsetMinutes = -(etDate.getTime() - dt.getTime()) / 60000;
 
-  // Offset in minutes between ET and UTC
-  const offsetMinutes = (dtET - dt) / 60000;
-
-  const hours = Math.floor(Math.abs(offsetMinutes) / 60);
-  const minutes = Math.abs(offsetMinutes) % 60;
-  const sign = offsetMinutes > 0 ? '-' : '+';
-  return `${sign}${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const hours = String(Math.floor(Math.abs(offsetMinutes)/60)).padStart(2,'0');
+  const minutes = String(Math.abs(offsetMinutes)%60).padStart(2,'0');
+  return `${sign}${hours}:${minutes}`;
 }
-
 
 function fmtLocal(dtStr) {
   try {
-    const offset = getETOffset(dtStr);            // e.g., '-04:00' or '-05:00'
-    const dtWithOffset = dtStr + offset;          // append ET offset
+    const offset = getETOffset(dtStr);       // e.g., '+04:00' or '+05:00'
+    const dtWithOffset = dtStr + offset;     // append ET offset
     return new Date(dtWithOffset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   } catch {
     return dtStr;
   }
 }
 
-  function ymd(d) {
-  // Convert to ET
-  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
-  const parts = d.toLocaleDateString('en-US', options).split('/');
-  return `${parts[2]}-${parts[0]}-${parts[1]}`; // YYYY-MM-DD
+function ymd(d) {
+  const parts = d.toLocaleString('en-US', { timeZone: 'America/New_York' }).split(',')[0].split('/');
+  return `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
 }
 
 
