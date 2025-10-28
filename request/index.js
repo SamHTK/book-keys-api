@@ -11,15 +11,33 @@ function toIsoNoZ(dtIso) {
   return new Date(dtIso).toISOString().slice(0, 19);
 }
 
+// Convert Windows timezone names to IANA timezone names
+function windowsToIANA(windowsTz) {
+  const mapping = {
+    'Eastern Standard Time': 'America/New_York',
+    'Central Standard Time': 'America/Chicago',
+    'Mountain Standard Time': 'America/Denver',
+    'Pacific Standard Time': 'America/Los_Angeles',
+    'GMT Standard Time': 'Europe/London',
+    'Central European Standard Time': 'Europe/Paris',
+    'Tokyo Standard Time': 'Asia/Tokyo',
+    'AUS Eastern Standard Time': 'Australia/Sydney',
+  };
+  return mapping[windowsTz] || windowsTz;
+}
+
 // Friendly range formatter in a specific timezone (IANA zone recommended)
 function formatWhenRange(startIso, endIso, timeZone) {
   try {
+    // Convert Windows timezone to IANA if needed
+    const ianaTz = windowsToIANA(timeZone);
+    
     const start = new Date(startIso);
     const end = new Date(endIso);
 
     // Compare using a simple date-only formatter to detect same calendar day in the TZ
     const dayKey = (d) =>
-      new Intl.DateTimeFormat("en-CA", { timeZone }).format(d); // YYYY-MM-DD in practice
+      new Intl.DateTimeFormat("en-CA", { timeZone: ianaTz }).format(d); // YYYY-MM-DD in practice
 
     const sameDay = dayKey(start) === dayKey(end);
 
@@ -28,19 +46,19 @@ function formatWhenRange(startIso, endIso, timeZone) {
       month: "short",
       day: "numeric",
       year: "numeric",
-      timeZone
+      timeZone: ianaTz
     });
     const timeFmt = new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-      timeZone
+      timeZone: ianaTz
     });
     const timeFmtWithZone = new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-      timeZone,
+      timeZone: ianaTz,
       timeZoneName: "short"
     });
 
@@ -90,7 +108,7 @@ module.exports = async function (context, req) {
       : [];
     const notes = String(body.notes || "");
 
-    // Input timezone from UI (IANA zone preferred), default to UTC
+    // Input timezone from UI (can be Windows or IANA zone)
     const inputTimeZone = String(body.timeZone || body.timezone || body.tz || "").trim() || "UTC";
 
     if (!slug || !execEmail || !title || !start || !end || !customerEmail || !customerName) {
@@ -152,7 +170,7 @@ module.exports = async function (context, req) {
     const approveUrl = `${baseUrl}/api/requests/${encodeURIComponent(id)}/accept?t=${encodeURIComponent(token)}`;
     const declineUrl = `${baseUrl}/api/requests/${encodeURIComponent(id)}/decline?t=${encodeURIComponent(token)}`;
 
-    // Build email HTML
+    // Build email HTML - use inputTimeZone for display
     const whenHtml = htmlEscape(formatWhenRange(start, end, inputTimeZone));
     const attendeesHtml = [customerEmail, ...attendees].map(htmlEscape).join(", ");
 
