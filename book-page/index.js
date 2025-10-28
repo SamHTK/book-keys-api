@@ -109,11 +109,21 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-  function fmtLocal(dtIso) {
-    try {
-      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso));
-    } catch { return dtIso; }
+  function fmtLocal(dtStr) {
+  try {
+    // Treat input as "Eastern Time" without converting from UTC
+    // Append ET offset to ISO string (Eastern Time is UTC-5 or UTC-4 depending on DST)
+    // Using Intl API with timeZone works correctly
+    return new Intl.DateTimeFormat('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true, 
+      timeZone: 'America/New_York'
+    }).format(new Date(dtStr));
+  } catch {
+    return dtStr;
   }
+}
 
   function ymd(d) { return d.toISOString().slice(0,10); }
 
