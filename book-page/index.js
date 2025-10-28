@@ -109,18 +109,20 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-  function fmtLocal(dtIso) {
-    try {
-      const d = new Date(dtIso);
-      const parts = new Intl.DateTimeFormat(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' }).formatToParts(d);
-      const get = (t) => parts.find(p => p.type === t)?.value || '';
-      const hour = get('hour');
-      const minute = get('minute');
-      const dayPeriod = get('dayPeriod');
-      const tzName = get('timeZoneName');
-      return (hour + ':' + minute + ' ' + dayPeriod + ' ' + tzName).replace(/\s+/g, ' ').trim();
-    } catch { return dtIso; }
+function fmtLocal(dtIso) {
+  try {
+    const d = new Date(dtIso);
+    // Format local time with AM/PM only
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz
+    }).format(d);
+  } catch {
+    return dtIso;
   }
+}
 
   function ymd(d) { return d.toISOString().slice(0,10); }
 
@@ -175,18 +177,24 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
     validateForm();
     const d = dateEl.value;
     const duration = durationEl.value;
-    try {
-      const resp = await fetch('/api/book/' + encodeURIComponent(slug) + '/slots?date=' + encodeURIComponent(d) + '&duration=' + encodeURIComponent(duration));
-      const json = await resp.json();
-      if (!resp.ok) throw new Error(json && json.error || 'Failed to load slots');
-      let slots = json.slots || [];
-      try {
-        const todayYmd = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-        if (d === todayYmd) {
-          const now = Date.now();
-          slots = slots.filter(s => new Date(s.start).getTime() > now);
-        }
-      } catch {}
+  try {
+  const now = new Date();
+  const todayYmd = ymd(now);
+  const selectedDate = new Date(d + 'T00:00:00');
+  const oneWeekLater = new Date();
+  oneWeekLater.setDate(now.getDate() + 7);
+
+  // Prevent showing slots before now or more than a week ahead
+  slots = slots.filter(s => {
+    const slotTime = new Date(s.start);
+    return (
+      slotTime >= now && 
+      slotTime <= oneWeekLater
+    );
+  });
+} catch (e) {
+  console.error("Slot filter error:", e);
+}
       renderSlots(slots);
     } catch (e) {
       slotsEl.innerHTML = '';
