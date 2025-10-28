@@ -109,20 +109,11 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-function fmtLocal(dtIso) {
-  try {
-    const d = new Date(dtIso);
-    // Format local time with AM/PM only
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: tz
-    }).format(d);
-  } catch {
-    return dtIso;
+  function fmtLocal(dtIso) {
+    try {
+      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso));
+    } catch { return dtIso; }
   }
-}
 
   function ymd(d) { return d.toISOString().slice(0,10); }
 
@@ -177,25 +168,11 @@ function fmtLocal(dtIso) {
     validateForm();
     const d = dateEl.value;
     const duration = durationEl.value;
-  try {
-  const now = new Date();
-  const todayYmd = ymd(now);
-  const selectedDate = new Date(d + 'T00:00:00');
-  const oneWeekLater = new Date();
-  oneWeekLater.setDate(now.getDate() + 7);
-
-  // Prevent showing slots before now or more than a week ahead
-  slots = slots.filter(s => {
-    const slotTime = new Date(s.start);
-    return (
-      slotTime >= now && 
-      slotTime <= oneWeekLater
-    );
-  });
-} catch (e) {
-  console.error("Slot filter error:", e);
-}
-      renderSlots(slots);
+    try {
+      const resp = await fetch('/api/book/' + encodeURIComponent(slug) + '/slots?date=' + encodeURIComponent(d) + '&duration=' + encodeURIComponent(duration));
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json && json.error || 'Failed to load slots');
+      renderSlots(json.slots || []);
     } catch (e) {
       slotsEl.innerHTML = '';
       slotsStatusEl.textContent = 'Error loading slots: ' + e.message;
