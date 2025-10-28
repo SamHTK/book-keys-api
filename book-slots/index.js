@@ -11,6 +11,18 @@ async function getToken() {
   return token.token;
 }
 
+function isWeekend(dateIso, timeZone) {
+  // dateIso is YYYY-MM-DD
+  // Check if it's Saturday or Sunday in the given timezone
+  const dt = new Date(dateIso + 'T12:00:00'); // Use noon to avoid edge cases
+  const formatter = new Intl.DateTimeFormat('en-US', { 
+    timeZone: timeZone, 
+    weekday: 'long' 
+  });
+  const dayName = formatter.format(dt);
+  return dayName === 'Saturday' || dayName === 'Sunday';
+}
+
 function clampToBusinessHours(dateIso, { start, end }, timeZone) {
   // dateIso is YYYY-MM-DD in local browser, we construct start/end in tz
   // We ask Graph in the configured Windows tz, so we compute strings without Z
@@ -51,8 +63,15 @@ function slotsFromAvailability(availabilityView, windowStart, intervalMinutes, d
   const step = intervalMinutes; // step between slot starts
   const out = [];
 
+  // Get current time in the target timezone
+  const now = new Date();
+  
   for (let minute = 0; minute <= (blocks.length * blockMinutes - durationMinutes); minute += step) {
     const startDt = new Date(start.getTime() + minute * 60000);
+    
+    // Skip slots in the past
+    if (startDt <= now) continue;
+    
     const neededBlocks = Math.ceil(durationMinutes / blockMinutes);
     const startBlock = Math.floor(minute / blockMinutes);
     let ok = true;
@@ -75,6 +94,16 @@ module.exports = async function (context, req) {
     const duration = Math.max(15, Math.min(240, Number(req.query.duration || 30)));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       context.res = { status: 400, body: { error: 'Invalid or missing date' } };
+      return;
+    }
+
+    // Check if the requested date is a weekend
+    if (isWeekend(date, cfg.timeZone)) {
+      context.res = { 
+        status: 200, 
+        headers: { 'content-type': 'application/json' }, 
+        body: { slug, timeZone: cfg.timeZone, date, duration, slots: [] } 
+      };
       return;
     }
 
@@ -103,9 +132,6 @@ module.exports = async function (context, req) {
 
     const views = (json.value || []).map(x => String(x.availabilityView || ''));
     const combined = intersectBusy(views);
-
-    // windowStart in local with tz, but to compute ISO, we reconstruct startLocal as Date by appending 'Z'? We used local wall time string; to get a stable ISO span we parse as if local in that tz, but JS Date lacks tz parse.
-    // Simplification: Graph computes availabilityView from startLocal with the provided tz; treat the first block timestamp as the same local time in that tz and convert to UTC by asking Graph? For now, we approximate by treating startLocal as if it's in cfg.timeZone and use Date with no-Z string, which most engines parse as local. Azure Functions runs server-side; to avoid locale issues, we can pass back offsets as relative minute offsets and then reconstruct starts by adding minutes to the original body.startTime.
 
     // Better: Re-call time server to convert the local startLocal in cfg.timeZone to UTC using Intl API by formatting parts to get offset. We do a reasonable approximation:
     function toIsoFromLocal(localStr, tz) {
