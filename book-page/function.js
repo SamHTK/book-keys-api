@@ -6,8 +6,9 @@
       "direction": "in",
       "name": "req",
       "methods": ["get"],
-      "route": "book/{slug}/page"
+      "route": "book/{slug}"
     },
     { "type": "http", "direction": "out", "name": "res" }
   ]
 }
+
