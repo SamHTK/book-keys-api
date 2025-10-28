@@ -169,7 +169,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
     const d = dateEl.value;
     const duration = durationEl.value;
     try {
-      const resp = await fetch(\`/api/book/\${encodeURIComponent(slug)}/slots?date=\${encodeURIComponent(d)}&duration=\${encodeURIComponent(duration)}\`);
+      const resp = await fetch('/api/book/' + encodeURIComponent(slug) + '/slots?date=' + encodeURIComponent(d) + '&duration=' + encodeURIComponent(duration));
       const json = await resp.json();
       if (!resp.ok) throw new Error(json && json.error || 'Failed to load slots');
       renderSlots(json.slots || []);
@@ -199,7 +199,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
         wantsTeams: !!wantsTeamsEl.checked,
         notes: notesEl.value
       };
-      const resp = await fetch(\`/api/book/\${encodeURIComponent(slug)}/request\`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const resp = await fetch('/api/book/' + encodeURIComponent(slug) + '/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const json = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(json && json.error || 'Failed to submit request');
       submitStatus.className = 'success';
@@ -217,5 +217,5 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   loadSlots();
   </script>
 </body>
-</html>\`;
+</html>`;
 }
