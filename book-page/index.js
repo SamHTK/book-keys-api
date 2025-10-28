@@ -1,4 +1,16 @@
-const { getPageConfig } = require("../lib/pages");
+let getPageConfig;
+try {
+  // Log early to detect module import failures
+  console.log("book-page: starting module load");
+  ({ getPageConfig } = require("../lib/pages"));
+  console.log("book-page: pages module loaded");
+} catch (e) {
+  // If require fails (path, encoding, etc.), keep a stub so handler can return diagnostics
+  console.error("book-page: failed to load ../lib/pages:", e && (e.stack || e.message || String(e)));
+  getPageConfig = function () {
+    throw new Error("pages-module-load-failed");
+  };
+}
 
 function htmlEscape(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -77,113 +89,56 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const tz = ${JSON.stringify(timeZone)};
 
   function fmtLocal(dtIso) {
-    // Show local time; include short tz name
-    try {
-      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso));
-    } catch { return dtIso; }
+    try { return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso)); }
+    catch { return dtIso; }
   }
-
   function ymd(d) { return d.toISOString().slice(0,10); }
-
   const dateEl = document.getElementById('date');
   const durationEl = document.getElementById('duration');
   const slotsEl = document.getElementById('slots');
   const slotsStatusEl = document.getElementById('slotsStatus');
   const submitBtn = document.getElementById('submit');
   const submitStatus = document.getElementById('submitStatus');
-
   const emailEl = document.getElementById('email');
   const titleEl = document.getElementById('title');
   const attendeesEl = document.getElementById('attendees');
   const wantsTeamsEl = document.getElementById('wantsTeams');
   const notesEl = document.getElementById('notes');
-
   let selected = null;
-
-  function validateForm() {
-    const ok = !!selected && emailEl.value.trim() && titleEl.value.trim();
-    submitBtn.disabled = !ok;
-  }
-
+  function validateForm() { const ok = !!selected && emailEl.value.trim() && titleEl.value.trim(); submitBtn.disabled = !ok; }
   function renderSlots(slots) {
     slotsEl.innerHTML = '';
     selected = null;
     validateForm();
-    if (!slots || !slots.length) {
-      slotsStatusEl.textContent = 'No slots available on this day.';
-      return;
-    }
+    if (!slots || !slots.length) { slotsStatusEl.textContent = 'No slots available on this day.'; return; }
     slotsStatusEl.textContent = '';
     for (const s of slots) {
       const btn = document.createElement('button');
-      btn.className = 'slot';
-      btn.type = 'button';
-      btn.textContent = fmtLocal(s.start);
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.slot.selected').forEach(el => el.classList.remove('selected'));
-        btn.classList.add('selected');
-        selected = s;
-        validateForm();
-      });
+      btn.className = 'slot'; btn.type = 'button'; btn.textContent = fmtLocal(s.start);
+      btn.addEventListener('click', () => { document.querySelectorAll('.slot.selected').forEach(el => el.classList.remove('selected')); btn.classList.add('selected'); selected = s; validateForm(); });
       slotsEl.appendChild(btn);
     }
   }
-
   async function loadSlots() {
-    slotsEl.innerHTML = '';
-    slotsStatusEl.textContent = 'Loading...';
-    selected = null;
-    validateForm();
-    const d = dateEl.value;
-    const duration = durationEl.value;
-    try {
-      const resp = await fetch(`/api/book/${encodeURIComponent(slug)}/slots?date=${encodeURIComponent(d)}&duration=${encodeURIComponent(duration)}`);
-      const json = await resp.json();
-      if (!resp.ok) throw new Error(json && json.error || 'Failed to load slots');
-      renderSlots(json.slots || []);
-    } catch (e) {
-      slotsEl.innerHTML = '';
-      slotsStatusEl.textContent = 'Error loading slots: ' + e.message;
-    }
+    slotsEl.innerHTML = ''; slotsStatusEl.textContent = 'Loading...'; selected = null; validateForm();
+    const d = dateEl.value; const duration = durationEl.value;
+    try { const resp = await fetch(`/api/book/${encodeURIComponent(slug)}/slots?date=${encodeURIComponent(d)}&duration=${encodeURIComponent(duration)}`);
+      const json = await resp.json(); if (!resp.ok) throw new Error(json && json.error || 'Failed to load slots');
+      renderSlots(json.slots || []); } catch (e) { slotsEl.innerHTML = ''; slotsStatusEl.textContent = 'Error loading slots: ' + e.message; }
   }
-
-  dateEl.addEventListener('change', loadSlots);
-  durationEl.addEventListener('change', loadSlots);
-  emailEl.addEventListener('input', validateForm);
-  titleEl.addEventListener('input', validateForm);
-
+  dateEl.addEventListener('change', loadSlots); durationEl.addEventListener('change', loadSlots);
+  emailEl.addEventListener('input', validateForm); titleEl.addEventListener('input', validateForm);
   submitBtn.addEventListener('click', async () => {
-    if (!selected) return;
-    submitBtn.disabled = true;
-    submitStatus.textContent = 'Submitting...';
-    try {
-      const duration = Number(durationEl.value);
-      const body = {
-        start: selected.start,
-        duration,
-        title: titleEl.value.trim(),
-        email: emailEl.value.trim(),
-        additionalAttendees: attendeesEl.value.split(',').map(s => s.trim()).filter(Boolean),
-        wantsTeams: !!wantsTeamsEl.checked,
-        notes: notesEl.value
-      };
+    if (!selected) return; submitBtn.disabled = true; submitStatus.textContent = 'Submitting...';
+    try { const duration = Number(durationEl.value);
+      const body = { start: selected.start, duration, title: titleEl.value.trim(), email: emailEl.value.trim(), additionalAttendees: attendeesEl.value.split(',').map(s => s.trim()).filter(Boolean), wantsTeams: !!wantsTeamsEl.checked, notes: notesEl.value };
       const resp = await fetch(`/api/book/${encodeURIComponent(slug)}/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const json = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(json && json.error || 'Failed to submit request');
-      submitStatus.className = 'success';
-      submitStatus.textContent = 'Request submitted. Check your email for confirmation after approval.';
-    } catch (e) {
-      submitStatus.className = 'error';
-      submitStatus.textContent = e.message;
-    } finally {
-      submitBtn.disabled = false;
-    }
+      const json = await resp.json().catch(() => ({})); if (!resp.ok) throw new Error(json && json.error || 'Failed to submit request');
+      submitStatus.className = 'success'; submitStatus.textContent = 'Request submitted. Check your email for confirmation after approval.'; }
+    catch (e) { submitStatus.className = 'error'; submitStatus.textContent = e.message; }
+    finally { submitBtn.disabled = false; }
   });
-
-  // Init date to today (or next weekday if weekend can be added later)
-  const today = new Date();
-  dateEl.value = ymd(today);
-  loadSlots();
+  const today = new Date(); dateEl.value = ymd(today); loadSlots();
   </script>
 </body>
 </html>`;
@@ -192,10 +147,22 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
 module.exports = async function (context, req) {
   try {
     const slug = context.bindingData.slug;
-    const cfg = getPageConfig(slug);
+    context.log("book-page: handler begin", slug);
+
+    let cfg;
+    try {
+      cfg = getPageConfig(slug);
+      context.log("book-page: config loaded", JSON.stringify({ slug: cfg.slug, tz: cfg.timeZone }));
+    } catch (e) {
+      context.log.error("book-page: getPageConfig failed:", e && (e.stack || e.message || String(e)));
+      context.res = { status: 404, headers: { 'content-type': 'text/html' }, body: '<!doctype html><html><body><p>Booking page not found.</p></body></html>' };
+      return;
+    }
+
     context.res = { status: 200, headers: { 'content-type': 'text/html' }, body: pageHtml(cfg) };
   } catch (err) {
-    context.log.error(err.stack || err.message || String(err));
-    context.res = { status: 404, headers: { 'content-type': 'text/html' }, body: '<!doctype html><html><body><p>Booking page not found.</p></body></html>' };
+    context.log.error("book-page: unhandled error:", err && (err.stack || err.message || String(err)));
+    // Return a minimal OK page to prove handler reached catch
+    context.res = { status: 200, headers: { 'content-type': 'text/html' }, body: '<!doctype html><html><body><p>book-page reached catch; check logs for details.</p></body></html>' };
   }
 };
