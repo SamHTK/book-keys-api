@@ -118,7 +118,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
       const minute = get('minute');
       const dayPeriod = get('dayPeriod');
       const tzName = get('timeZoneName');
-      return \`\${hour}:\${minute} \${dayPeriod} \${tzName}\`.replace(/\\s+/g, ' ').trim();
+      return (hour + ':' + minute + ' ' + dayPeriod + ' ' + tzName).replace(/\s+/g, ' ').trim();
     } catch { return dtIso; }
   }
 
