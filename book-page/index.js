@@ -111,15 +111,23 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
 
 function fmtLocal(dtStr) {
   try {
-    // Parse the ISO datetime string directly
-    const dt = new Date(dtStr);
-    // Format in ET time zone
-    return dt.toLocaleTimeString('en-US', { 
-      timeZone: 'America/New_York',
-      hour: 'numeric', 
-      minute: '2-digit', 
-      hour12: true 
-    });
+    // The datetime string is already in Eastern Time
+    // Parse it as-is and format the time portion
+    // Example: "2025-10-28T14:30:00" should display as "2:30 PM"
+    
+    // Remove any timezone suffix if present
+    const cleanStr = dtStr.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+    
+    // Split into date and time parts
+    const [datePart, timePart] = cleanStr.split('T');
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    // Format as 12-hour time
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    
+    return \`\${displayHours}:\${displayMinutes} \${period}\`;
   } catch {
     return dtStr;
   }
