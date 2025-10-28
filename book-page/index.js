@@ -111,7 +111,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
 
   function fmtLocal(dtIso) {
     try {
-      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso));
+      return new Intl.DateTimeFormat(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dtIso));
     } catch { return dtIso; }
   }
 
