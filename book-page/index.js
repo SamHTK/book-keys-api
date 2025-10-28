@@ -109,33 +109,43 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
+// Convert Windows timezone names to IANA timezone names
+function windowsToIANA(windowsTz) {
+  const mapping = {
+    'Eastern Standard Time': 'America/New_York',
+    'Central Standard Time': 'America/Chicago',
+    'Mountain Standard Time': 'America/Denver',
+    'Pacific Standard Time': 'America/Los_Angeles',
+    'GMT Standard Time': 'Europe/London',
+    'Central European Standard Time': 'Europe/Paris',
+    'Tokyo Standard Time': 'Asia/Tokyo',
+    'AUS Eastern Standard Time': 'Australia/Sydney',
+  };
+  return mapping[windowsTz] || windowsTz;
+}
+
 function fmtLocal(dtStr) {
   try {
-    // The datetime string is already in Eastern Time
-    // Parse it as-is and format the time portion
-    // Example: "2025-10-28T14:30:00" should display as "2:30 PM"
+    // Parse the ISO datetime string (it's in UTC)
+    const dt = new Date(dtStr);
+    const ianaTz = windowsToIANA(tz);
     
-    // Remove any timezone suffix if present
-    const cleanStr = dtStr.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
-    
-    // Split into date and time parts
-    const [datePart, timePart] = cleanStr.split('T');
-    const [hours, minutes] = timePart.split(':').map(Number);
-    
-    // Format as 12-hour time
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = minutes.toString().padStart(2, '0');
-    
-    return \`\${displayHours}:\${displayMinutes} \${period}\`;
+    // Format in the configured timezone
+    return dt.toLocaleTimeString('en-US', { 
+      timeZone: ianaTz,
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
   } catch {
     return dtStr;
   }
 }
 
 function ymd(d) {
-  // Get the date in ET timezone
-  const parts = d.toLocaleString('en-US', { timeZone: 'America/New_York' }).split(',')[0].split('/');
+  // Get the date in the configured timezone
+  const ianaTz = windowsToIANA(tz);
+  const parts = d.toLocaleString('en-US', { timeZone: ianaTz }).split(',')[0].split('/');
   const month = parts[0].padStart(2,'0');
   const day = parts[1].padStart(2,'0');
   const year = parts[2];
