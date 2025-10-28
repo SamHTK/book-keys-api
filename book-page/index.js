@@ -109,37 +109,30 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const slug = ${JSON.stringify(slug)};
   const tz = ${JSON.stringify(timeZone)};
 
-function getETOffset(dateStr) {
-  // Parse the date as local time (or as UTC)
-  const dt = new Date(dateStr);
-
-  // Create a Date object in ET using Intl
-  const etDate = new Date(dt.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-
-  // Difference in minutes between ET and UTC
-  const offsetMinutes = -(etDate.getTime() - dt.getTime()) / 60000;
-
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const hours = String(Math.floor(Math.abs(offsetMinutes)/60)).padStart(2,'0');
-  const minutes = String(Math.abs(offsetMinutes)%60).padStart(2,'0');
-  return `${sign}${hours}:${minutes}`;
-}
-
 function fmtLocal(dtStr) {
   try {
-    const offset = getETOffset(dtStr);       // e.g., '+04:00' or '+05:00'
-    const dtWithOffset = dtStr + offset;     // append ET offset
-    return new Date(dtWithOffset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    // Parse the ISO datetime string directly
+    const dt = new Date(dtStr);
+    // Format in ET time zone
+    return dt.toLocaleTimeString('en-US', { 
+      timeZone: 'America/New_York',
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
   } catch {
     return dtStr;
   }
 }
 
 function ymd(d) {
+  // Get the date in ET timezone
   const parts = d.toLocaleString('en-US', { timeZone: 'America/New_York' }).split(',')[0].split('/');
-  return `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+  const month = parts[0].padStart(2,'0');
+  const day = parts[1].padStart(2,'0');
+  const year = parts[2];
+  return \`\${year}-\${month}-\${day}\`;
 }
-
 
   const dateEl = document.getElementById('date');
   const durationEl = document.getElementById('duration');
