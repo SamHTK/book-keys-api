@@ -11,12 +11,29 @@ async function getToken() {
   return token.token;
 }
 
+// Convert Windows timezone names to IANA timezone names
+function windowsToIANA(windowsTz) {
+  const mapping = {
+    'Eastern Standard Time': 'America/New_York',
+    'Central Standard Time': 'America/Chicago',
+    'Mountain Standard Time': 'America/Denver',
+    'Pacific Standard Time': 'America/Los_Angeles',
+    'GMT Standard Time': 'Europe/London',
+    'Central European Standard Time': 'Europe/Paris',
+    'Tokyo Standard Time': 'Asia/Tokyo',
+    'AUS Eastern Standard Time': 'Australia/Sydney',
+    // Add more mappings as needed
+  };
+  return mapping[windowsTz] || windowsTz; // Fall back to original if not found
+}
+
 function isWeekend(dateIso, timeZone) {
   // dateIso is YYYY-MM-DD
   // Check if it's Saturday or Sunday in the given timezone
+  const ianaTz = windowsToIANA(timeZone);
   const dt = new Date(dateIso + 'T12:00:00'); // Use noon to avoid edge cases
   const formatter = new Intl.DateTimeFormat('en-US', { 
-    timeZone: timeZone, 
+    timeZone: ianaTz, 
     weekday: 'long' 
   });
   const dayName = formatter.format(dt);
@@ -137,13 +154,14 @@ module.exports = async function (context, req) {
     function toIsoFromLocal(localStr, tz) {
       try {
         // localStr = 'YYYY-MM-DDTHH:mm:00'
+        const ianaTz = windowsToIANA(tz);
         const [d, t] = localStr.split('T');
         const [Y, M, D] = d.split('-').map(Number);
         const [h, m] = t.split(':').map(Number);
         // Construct a Date in the target tz by formatting a UTC date that yields same local parts
         // Find UTC timestamp whose parts in tz equal Y-M-D h:m
         const base = Date.UTC(Y, M - 1, D, h, m, 0);
-        const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        const fmt = new Intl.DateTimeFormat('en-US', { timeZone: ianaTz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
         function parts(ts) {
           const p = fmt.formatToParts(new Date(ts));
           const get = (type) => Number(p.find(x => x.type === type).value);
