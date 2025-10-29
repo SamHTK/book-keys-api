@@ -39,6 +39,19 @@ function htmlEscape(s) {
 
 function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const title = `Book time with ${schedulerUpn}`;
+  
+  // Format business hours in 12-hour format
+  function formatTime(time24) {
+    const [hours, minutes] = time24.split(':');
+    const h = parseInt(hours);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${period}`;
+  }
+  
+  const formattedStart = formatTime(businessHours.start);
+  const formattedEnd = formatTime(businessHours.end);
+  
   return `<!doctype html>
 <html>
 <head>
@@ -65,7 +78,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
     .muted{color:#64748b}
     .error{color:#b91c1c}
     .success{color:#065f46}
-    .toggle-container{display:flex;align-items:center;gap:10px;margin:8px 0}
+    .toggle-container{display:flex;align-items:center;gap:10px;margin:12px 0}
     .toggle-switch{position:relative;display:inline-block;width:48px;height:24px}
     .toggle-switch input{opacity:0;width:0;height:0}
     .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#cbd5e1;border-radius:24px;transition:.3s}
@@ -78,7 +91,7 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
 <body>
   <header>
     <h2 style="margin:0">${htmlEscape(title)}</h2>
-    <div class="muted">Time zone: ${htmlEscape(timeZone)} | Business hours: ${htmlEscape(businessHours.start)}–${htmlEscape(businessHours.end)}</div>
+    <div class="muted">Time zone: ${htmlEscape(timeZone)} | Business hours: ${htmlEscape(formattedStart)}–${htmlEscape(formattedEnd)}</div>
   </header>
   <main>
     <div class="row">
@@ -103,7 +116,13 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
         <input id="title" type="text" placeholder="Meeting subject" />
         <div class="label">Additional attendees (comma-separated emails, optional)</div>
         <input id="attendees" type="text" placeholder="alice@example.com,bob@example.com" />
-        <div class="label"><label><input id="wantsTeams" type="checkbox" /> Request Microsoft Teams meeting</label></div>
+        <div class="toggle-container">
+          <label class="toggle-switch">
+            <input id="wantsTeams" type="checkbox" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span>Request Microsoft Teams meeting</span>
+        </div>
         <div class="label">Notes (optional)</div>
         <textarea id="notes" placeholder="Add any context"></textarea>
         <div class="actions">
