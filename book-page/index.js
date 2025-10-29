@@ -39,6 +39,19 @@ function htmlEscape(s) {
 
 function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
   const title = `Book time with ${schedulerUpn}`;
+  
+  // Format business hours in 12-hour format
+  function formatTime(time24) {
+    const [hours, minutes] = time24.split(':');
+    const h = parseInt(hours);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${period}`;
+  }
+  
+  const formattedStart = formatTime(businessHours.start);
+  const formattedEnd = formatTime(businessHours.end);
+  
   return `<!doctype html>
 <html>
 <head>
@@ -51,9 +64,9 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
     main{max-width:960px;margin:0 auto;padding:20px}
     .row{display:flex;gap:20px;flex-wrap:wrap}
     .col{flex:1 1 320px}
-    .card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;box-sizing:border-box}
     .label{font-weight:600;margin:6px 0 4px}
-    input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px}
+    input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}
     textarea{min-height:90px}
     .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
     .slot{padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;cursor:pointer;background:#fff}
@@ -65,12 +78,20 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
     .muted{color:#64748b}
     .error{color:#b91c1c}
     .success{color:#065f46}
+    .toggle-container{display:flex;align-items:center;gap:10px;margin:12px 0}
+    .toggle-switch{position:relative;display:inline-block;width:48px;height:24px}
+    .toggle-switch input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#cbd5e1;border-radius:24px;transition:.3s}
+    .toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:white;border-radius:50%;transition:.3s}
+    input:checked + .toggle-slider{background-color:#2563eb}
+    input:checked + .toggle-slider:before{transform:translateX(24px)}
+    input:focus + .toggle-slider{box-shadow:0 0 1px #2563eb}
   </style>
 </head>
 <body>
   <header>
     <h2 style="margin:0">${htmlEscape(title)}</h2>
-    <div class="muted">Time zone: ${htmlEscape(timeZone)} | Business hours: ${htmlEscape(businessHours.start)}–${htmlEscape(businessHours.end)}</div>
+    <div class="muted">Time zone: ${htmlEscape(timeZone)} | Business hours: ${htmlEscape(formattedStart)}–${htmlEscape(formattedEnd)}</div>
   </header>
   <main>
     <div class="row">
@@ -95,7 +116,13 @@ function pageHtml({ slug, schedulerUpn, timeZone, businessHours }) {
         <input id="title" type="text" placeholder="Meeting subject" />
         <div class="label">Additional attendees (comma-separated emails, optional)</div>
         <input id="attendees" type="text" placeholder="alice@example.com,bob@example.com" />
-        <div class="label"><label><input id="wantsTeams" type="checkbox" /> Request Microsoft Teams meeting</label></div>
+        <div class="toggle-container">
+          <label class="toggle-switch">
+            <input id="wantsTeams" type="checkbox" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span>Request Microsoft Teams meeting</span>
+        </div>
         <div class="label">Notes (optional)</div>
         <textarea id="notes" placeholder="Add any context"></textarea>
         <div class="actions">
